@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Star,
   Users,
@@ -16,7 +17,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { formatCurrency, formatDate, getStatusBadgeClass, getStatusText } from '../utils';
+import { formatCurrency, formatDate } from '../utils';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import PageContainer from '../components/layout/PageContainer';
@@ -24,7 +25,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs';
-import type { Plugin } from '../types';
 
 const iconMap: Record<string, React.FC<{ className?: string }>> = {
   LayoutGrid,
@@ -40,26 +40,28 @@ interface PluginDetailProps {
 }
 
 export default function PluginDetail({ pluginId }: PluginDetailProps) {
-  const { plugins, versions, subscriptions, purchaseSubscription } = useAppStore();
+  const { id: routePluginId } = useParams();
+  const { plugins, versions, currentRole, purchaseSubscription, isSubscribed } = useAppStore();
+  const navigate = useNavigate();
   const [plan, setPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [seatCount, setSeatCount] = useState(1);
+  const resolvedPluginId = pluginId ?? routePluginId;
+  const canPurchaseSubscription = currentRole === 'admin';
+  const canOpenSeatStatus = currentRole === 'admin' || currentRole === 'member';
 
   const currentPlugin = useMemo(() => {
-    if (pluginId) {
-      return plugins.find(p => p.id === pluginId);
+    if (resolvedPluginId) {
+      return plugins.find(p => p.id === resolvedPluginId);
     }
     return plugins[0];
-  }, [plugins, pluginId]);
+  }, [plugins, resolvedPluginId]);
 
   const pluginVersions = useMemo(() => {
     if (!currentPlugin) return [];
     return versions.filter(v => v.pluginId === currentPlugin.id);
   }, [versions, currentPlugin]);
 
-  const isSubscribed = useMemo(() => {
-    if (!currentPlugin) return false;
-    return subscriptions.some(s => s.pluginId === currentPlugin.id && s.status === 'active');
-  }, [subscriptions, currentPlugin]);
+  const pluginSubscribed = currentPlugin ? isSubscribed(currentPlugin.id) : false;
 
   if (!currentPlugin) {
     return (
@@ -77,8 +79,27 @@ export default function PluginDetail({ pluginId }: PluginDetailProps) {
 
   const IconComponent = iconMap[currentPlugin.icon] || LayoutGrid;
   const totalPrice = (plan === 'monthly' ? currentPlugin.monthlyPrice : currentPlugin.yearlyPrice) * seatCount;
+  const actionLabel = pluginSubscribed
+    ? canOpenSeatStatus
+      ? currentRole === 'admin'
+        ? '管理团队席位'
+        : '查看我的席位'
+      : '当前团队已订阅'
+    : canPurchaseSubscription
+      ? '立即订阅'
+      : '仅管理员可订阅';
+  const actionDisabled = (!pluginSubscribed && !canPurchaseSubscription) || (pluginSubscribed && !canOpenSeatStatus);
 
   const handlePurchase = () => {
+    if (pluginSubscribed) {
+      if (canOpenSeatStatus) {
+        navigate('/seats');
+      }
+      return;
+    }
+
+    if (!canPurchaseSubscription) return;
+
     purchaseSubscription(currentPlugin.id, plan, seatCount);
   };
 
@@ -107,7 +128,7 @@ export default function PluginDetail({ pluginId }: PluginDetailProps) {
                         <h1 className="text-3xl font-bold text-text-primary">
                           {currentPlugin.name}
                         </h1>
-                        {isSubscribed && (
+                        {pluginSubscribed && (
                           <Badge variant="success">
                             <Check className="w-3 h-3 mr-1" />
                             已订阅
@@ -324,14 +345,22 @@ export default function PluginDetail({ pluginId }: PluginDetailProps) {
                     </div>
 
                     <Button
-                      variant={isSubscribed ? 'secondary' : 'primary'}
+                      variant={pluginSubscribed || !canPurchaseSubscription ? 'secondary' : 'primary'}
                       className="w-full"
                       onClick={handlePurchase}
                       size="lg"
+                      disabled={actionDisabled}
                     >
                       <ShoppingCart className="w-5 h-5" />
-                      {isSubscribed ? '继续订阅' : '立即订阅'}
+                      {actionLabel}
                     </Button>
+                    {!canPurchaseSubscription && (
+                      <p className="mt-3 text-xs text-text-muted">
+                        {currentRole === 'member'
+                          ? '团队成员可以查看插件详情和自己的席位，订阅与续费需由管理员完成。'
+                          : '作者账号仅可浏览插件信息，团队订阅与席位管理需由管理员完成。'}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 

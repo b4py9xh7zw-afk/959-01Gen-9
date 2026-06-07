@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, matchPath } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
@@ -10,11 +10,39 @@ import AuthorCenter from "./pages/AuthorCenter";
 import Profile from "./pages/Profile";
 import { useAppStore } from "./store/useAppStore";
 
+const allowedRoutesByRole = {
+  admin: ['/', '/marketplace', '/marketplace/:id', '/seats', '/updates', '/payments', '/profile'],
+  member: ['/', '/marketplace', '/marketplace/:id', '/seats', '/updates', '/profile'],
+  author: ['/', '/marketplace', '/marketplace/:id', '/updates', '/profile'],
+} as const;
+
+function isPathAllowed(role: keyof typeof allowedRoutesByRole, pathname: string) {
+  return allowedRoutesByRole[role].some(pattern =>
+    Boolean(matchPath({ path: pattern, end: true }, pathname))
+  );
+}
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAppStore();
+  const location = useLocation();
+
+  if (!currentUser) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!isPathAllowed(currentUser.role, location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { currentRole, currentUser } = useAppStore();
-  const isLoggedIn = !!currentUser;
+  const activeRole = currentUser?.role ?? currentRole;
+  const homePage = activeRole === 'author' ? <AuthorCenter /> : <Dashboard />;
 
-  if (!isLoggedIn) {
+  if (!currentUser) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -23,28 +51,15 @@ function AppRoutes() {
     );
   }
 
-  if (currentRole === 'author') {
-    return (
-      <Routes>
-        <Route path="/" element={<AuthorCenter />} />
-        <Route path="/marketplace" element={<Marketplace />} />
-        <Route path="/marketplace/:id" element={<PluginDetail />} />
-        <Route path="/updates" element={<Updates />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
-
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/marketplace" element={<Marketplace />} />
-      <Route path="/marketplace/:id" element={<PluginDetail />} />
-      <Route path="/seats" element={<Seats />} />
-      <Route path="/updates" element={<Updates />} />
-      <Route path="/payments" element={<Payments />} />
-      <Route path="/profile" element={<Profile />} />
+      <Route path="/" element={<RequireAuth>{homePage}</RequireAuth>} />
+      <Route path="/marketplace" element={<RequireAuth><Marketplace /></RequireAuth>} />
+      <Route path="/marketplace/:id" element={<RequireAuth><PluginDetail /></RequireAuth>} />
+      <Route path="/seats" element={<RequireAuth><Seats /></RequireAuth>} />
+      <Route path="/updates" element={<RequireAuth><Updates /></RequireAuth>} />
+      <Route path="/payments" element={<RequireAuth><Payments /></RequireAuth>} />
+      <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

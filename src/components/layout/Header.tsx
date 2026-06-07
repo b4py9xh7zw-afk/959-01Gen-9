@@ -1,13 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Bell, User, LogOut, Settings, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../utils';
 
+const roleLabels = {
+  admin: '管理员',
+  member: '团队成员',
+  author: '插件作者',
+} as const;
+
 export default function Header() {
-  const { currentUser } = useAppStore();
+  const { currentUser, currentRole, logout } = useAppStore();
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -18,6 +31,8 @@ export default function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  if (!currentUser) return null;
 
   const unreadNotifications = 3;
 
@@ -61,7 +76,7 @@ export default function Header() {
                 {currentUser.name}
               </p>
               <p className="text-xs text-text-muted capitalize">
-                {currentUser.role}
+                {roleLabels[currentRole]}
               </p>
             </div>
             <ChevronDown className={cn(
@@ -102,7 +117,10 @@ export default function Header() {
               </div>
 
               <div className="p-2 border-t border-border">
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-colors">
+                <button 
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-colors"
+                  onClick={handleLogout}
+                >
                   <LogOut className="w-4 h-4" />
                   退出登录
                 </button>

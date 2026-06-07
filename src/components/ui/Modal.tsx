@@ -1,7 +1,7 @@
 import { useEffect, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { cn } from '../../utils';
+import { cn } from '../../lib/utils';
 
 interface ModalProps {
   title?: string;

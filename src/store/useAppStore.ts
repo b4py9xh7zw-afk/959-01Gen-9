@@ -16,9 +16,34 @@ import {
   mockAuthorStats,
 } from '../data/mockData';
 
+type AppRole = 'admin' | 'member' | 'author';
+
+const defaultMember = mockMembers.find(member => member.role === 'member' && member.isActive) ?? mockMembers[0];
+
+const createUserFromMember = (member: Member): User => ({
+  id: member.id,
+  name: member.name,
+  email: member.email,
+  avatar: member.avatar,
+  role: member.role,
+  teamId: member.teamId,
+});
+
+const getLoginUser = (role: AppRole): User => {
+  if (role === 'author') {
+    return mockAuthor;
+  }
+
+  if (role === 'member') {
+    return createUserFromMember(defaultMember);
+  }
+
+  return mockUser;
+};
+
 interface AppState {
-  currentUser: User;
-  currentRole: 'admin' | 'member' | 'author';
+  currentUser: User | null;
+  currentRole: AppRole;
   team: Team;
   members: Member[];
   plugins: Plugin[];
@@ -32,12 +57,14 @@ interface AppState {
   authorStats: AuthorStats;
   isModalOpen: boolean;
   modalType: string | null;
-  modalData: any;
+  modalData: unknown;
   
-  setCurrentRole: (role: 'admin' | 'member' | 'author') => void;
-  openModal: (type: string, data?: any) => void;
+  login: (role: AppRole) => void;
+  logout: () => void;
+  openModal: (type: string, data?: unknown) => void;
   closeModal: () => void;
   
+  isSubscribed: (pluginId: string) => boolean;
   assignSeat: (seatId: string, memberId: string) => void;
   revokeSeat: (seatId: string) => void;
   addPaymentMethod: (method: Omit<PaymentMethod, 'id' | 'teamId'>) => void;
@@ -51,7 +78,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  currentUser: mockUser,
+  currentUser: null,
   currentRole: 'admin',
   team: mockTeam,
   members: mockMembers,
@@ -68,9 +95,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   modalType: null,
   modalData: null,
 
-  setCurrentRole: (role) => {
-    const user = role === 'author' ? mockAuthor : mockUser;
-    set({ currentRole: role, currentUser: user });
+  login: (role) => {
+    set({ currentRole: role, currentUser: getLoginUser(role) });
+  },
+
+  logout: () => {
+    set({ currentUser: null, currentRole: 'admin' });
+  },
+
+  isSubscribed: (pluginId) => {
+    return get().subscriptions.some(
+      sub => sub.pluginId === pluginId && sub.status === 'active'
+    );
   },
 
   openModal: (type, data) => {
@@ -82,6 +118,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   assignSeat: (seatId, memberId) => {
+    if (get().currentRole !== 'admin') return;
+
     const { seats, members } = get();
     const seat = seats.find(s => s.id === seatId);
     const member = members.find(m => m.id === memberId);
@@ -141,6 +179,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   revokeSeat: (seatId) => {
+    if (get().currentRole !== 'admin') return;
+
     const { seats, members } = get();
     const seat = seats.find(s => s.id === seatId);
     
@@ -193,6 +233,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addPaymentMethod: (method) => {
+    if (get().currentRole !== 'admin') return;
+
     const newMethod: PaymentMethod = {
       ...method,
       id: `payment-${Date.now()}`,
@@ -203,12 +245,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removePaymentMethod: (methodId) => {
+    if (get().currentRole !== 'admin') return;
+
     set({
       paymentMethods: get().paymentMethods.filter(p => p.id !== methodId),
     });
   },
 
   setDefaultPayment: (methodId) => {
+    if (get().currentRole !== 'admin') return;
+
     set({
       paymentMethods: get().paymentMethods.map(p => ({
         ...p,
@@ -218,8 +264,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   purchaseSubscription: (pluginId, plan, seatCount) => {
+    if (get().currentRole !== 'admin') {
+      console.warn('只有管理员可以购买插件订阅');
+      return;
+    }
+
     const plugin = get().plugins.find(p => p.id === pluginId);
     if (!plugin) return;
+    
+    if (get().isSubscribed(pluginId)) {
+      console.warn('该插件已订阅，无法重复购买');
+      return;
+    }
 
     const price = plan === 'monthly' ? plugin.monthlyPrice : plugin.yearlyPrice;
     const amount = price * seatCount;
@@ -288,6 +344,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   cancelSubscription: (subscriptionId) => {
+    if (get().currentRole !== 'admin') return;
+
     set({
       subscriptions: get().subscriptions.map(s =>
         s.id === subscriptionId ? { ...s, status: 'cancelled' as const } : s
@@ -296,6 +354,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   inviteMember: (email, name) => {
+    if (get().currentRole !== 'admin') return;
+
     const newMember: Member = {
       id: `member-${Date.now()}`,
       teamId: get().team.id,
@@ -328,6 +388,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeMember: (memberId) => {
+    if (get().currentRole !== 'admin') return;
+
     const member = get().members.find(m => m.id === memberId);
     if (!member) return;
 

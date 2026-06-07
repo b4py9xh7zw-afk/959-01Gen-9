@@ -27,8 +27,8 @@ import { Badge } from '../components/ui/Badge';
 
 export default function Profile() {
   const { currentUser, currentRole, authorProfile, authorStats, plugins } = useAppStore();
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
+  const [name, setName] = useState(currentUser?.name ?? '');
+  const [email, setEmail] = useState(currentUser?.email ?? '');
   const [company, setCompany] = useState(authorProfile?.company || '');
   const [website, setWebsite] = useState(authorProfile?.website || '');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -46,6 +46,10 @@ export default function Profile() {
   });
 
   const authorPlugins = plugins.filter(p => p.authorId === authorProfile?.id);
+
+  if (!currentUser) {
+    return null;
+  }
 
   const handleSaveProfile = () => {
     alert('个人信息已保存');

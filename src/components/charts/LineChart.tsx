@@ -7,7 +7,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { cn } from '../../utils';
+import { cn } from '../../lib/utils';
 
 interface DataPoint {
   name: string;

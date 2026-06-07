@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { formatCurrency, formatDate, getStatusBadgeClass, getStatusText } from '../utils';
+import { formatCurrency } from '../utils';
 import {
   Search,
   Star,
   ShoppingCart,
-  X,
   Check,
   Users,
   LayoutGrid,
@@ -34,12 +34,14 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
 };
 
 export default function Marketplace() {
-  const { plugins, subscriptions, openModal, closeModal, isModalOpen, modalType, modalData, purchaseSubscription } = useAppStore();
+  const navigate = useNavigate();
+  const { plugins, currentRole, openModal, closeModal, purchaseSubscription, isSubscribed } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [plan, setPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [seatCount, setSeatCount] = useState(1);
+  const canPurchaseSubscriptions = currentRole === 'admin';
 
   const categories = useMemo(() => {
     const cats = [...new Set(plugins.map(p => p.category))];
@@ -55,15 +57,24 @@ export default function Marketplace() {
     });
   }, [plugins, searchQuery, selectedCategory]);
 
-  const isSubscribed = (pluginId: string) => {
-    return subscriptions.some(s => s.pluginId === pluginId && s.status === 'active');
-  };
-
-  const handlePluginClick = (plugin: Plugin) => {
+  const handleSubscribe = (plugin: Plugin) => {
     setSelectedPlugin(plugin);
     setPlan('monthly');
     setSeatCount(1);
     openModal('pluginDetail', plugin);
+  };
+
+  const handleManage = (plugin: Plugin) => {
+    navigate(`/marketplace/${plugin.id}`);
+  };
+
+  const handlePluginClick = (plugin: Plugin) => {
+    const subscribed = isSubscribed(plugin.id);
+    if (subscribed || !canPurchaseSubscriptions) {
+      handleManage(plugin);
+    } else {
+      handleSubscribe(plugin);
+    }
   };
 
   const handlePurchase = () => {
@@ -156,11 +167,15 @@ export default function Marketplace() {
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handlePluginClick(plugin);
+                    if (subscribed || !canPurchaseSubscriptions) {
+                      handleManage(plugin);
+                    } else {
+                      handleSubscribe(plugin);
+                    }
                   }}
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  {subscribed ? '管理' : '订阅'}
+                  {subscribed ? '管理' : canPurchaseSubscriptions ? '订阅' : '查看详情'}
                 </Button>
               </CardFooter>
             </Card>

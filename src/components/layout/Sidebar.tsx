@@ -7,9 +7,9 @@ import {
   CreditCard,
   UserCircle,
   Zap,
-  ChevronDown,
-  Settings as SettingsIcon,
   LogOut,
+  Shield,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../utils';
@@ -38,16 +38,23 @@ const menuItems = {
   ],
 };
 
-const roleOptions = [
-  { value: 'admin', label: '管理员' },
-  { value: 'member', label: '团队成员' },
-  { value: 'author', label: '插件作者' },
-];
+const roleLabels = {
+  admin: '管理员',
+  member: '团队成员',
+  author: '插件作者',
+} as const;
 
 export default function Sidebar() {
-  const { currentRole, setCurrentRole, currentUser, setCurrentRole: setRole } = useAppStore();
+  const { currentRole, currentUser, logout } = useAppStore();
   const navigate = useNavigate();
   const items = menuItems[currentRole];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  if (!currentUser) return null;
 
   return (
     <aside className="w-64 bg-surface border-r border-border h-screen flex flex-col fixed left-0 top-0">
@@ -85,23 +92,13 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border">
-        <div className="mb-3">
-          <label className="text-xs font-medium text-text-muted mb-2 block">
-            角色切换
-          </label>
-          <div className="relative">
-            <select
-              value={currentRole}
-              onChange={(e) => setCurrentRole(e.target.value as 'admin' | 'member' | 'author')}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
-            >
-              {roleOptions.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+        <div className="mb-3 rounded-lg border border-border bg-background px-3 py-2.5">
+          <div className="mb-1 flex items-center gap-2 text-xs font-medium text-text-muted">
+            <Shield className="h-3.5 w-3.5" />
+            当前身份
+          </div>
+          <div className="text-sm font-medium text-text-primary">
+            {roleLabels[currentRole]}
           </div>
         </div>
 
@@ -121,10 +118,8 @@ export default function Sidebar() {
           </div>
           <button 
             className="p-1.5 rounded-lg hover:bg-surface-light text-text-secondary hover:text-text-primary transition-colors"
-            onClick={() => {
-              setRole('admin');
-              navigate('/login');
-            }}
+            onClick={handleLogout}
+            title="退出登录"
           >
             <LogOut className="w-4 h-4" />
           </button>

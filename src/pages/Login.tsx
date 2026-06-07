@@ -23,7 +23,7 @@ const features = [
 
 export default function Login() {
   const navigate = useNavigate();
-  const { setCurrentRole } = useAppStore();
+  const { login } = useAppStore();
   const [selectedRole, setSelectedRole] = useState<Role>('admin');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +34,7 @@ export default function Login() {
 
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 800));
-    setCurrentRole(selectedRole);
+    login(selectedRole);
     setIsLoading(false);
     navigate('/');
   };
